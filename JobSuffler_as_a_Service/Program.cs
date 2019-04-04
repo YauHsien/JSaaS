@@ -20,6 +20,9 @@
  *  給 CPU 。因此，主控程式能接受一個參數指示每秒可以派出多少件工作，使它小心地
  *  保持著所要求的速率。
  */
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using NLog.Extensions.Logging;
 using System;
 
 namespace JobSuffler_as_a_Service
@@ -28,7 +31,46 @@ namespace JobSuffler_as_a_Service
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            var servicesProvider = BuildDi();
+            var runner = servicesProvider.GetRequiredService<Runner>();
+
+            runner.DoAction("Action1");
+
+            Console.WriteLine("Press ANY key to exit");
+            Console.ReadLine();
+
+            // Ensure to flush and stop internal timers/threads before application-exit (Avoid segmentation fault on Linux)
+            NLog.LogManager.Shutdown();
+        }
+        private static ServiceProvider BuildDi()
+        {
+            return new ServiceCollection()
+                .AddLogging(builder => {
+                    builder.SetMinimumLevel(LogLevel.Trace);
+                    builder.AddNLog(new NLogProviderOptions
+                    {
+                        CaptureMessageTemplates = true,
+                        CaptureMessageProperties = true
+                    });
+                })
+                .AddTransient<Runner>()
+                .BuildServiceProvider();
+        }
+        public class Runner
+        {
+            private readonly ILogger<Runner> _logger;
+
+            public Runner(ILogger<Runner> logger)
+            {
+                _logger = logger;
+            }
+
+            public void DoAction(string name)
+            {
+                _logger.LogDebug(20, "Doing hard work! {Action}", name);
+            }
+
+
         }
     }
 }
